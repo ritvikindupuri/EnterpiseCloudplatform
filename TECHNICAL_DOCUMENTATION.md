@@ -143,6 +143,9 @@ This platform integrates 12 AWS services to create a comprehensive security moni
 
 **Purpose**: Hosts the attack simulation instances that generate real security events.
 
+![EC2 Attack Instances](docs/images/ec2-attack-instance.png)
+*Figure: The three running EC2 instances actively generating real attack telemetry: data exfiltration, crypto mining, and privilege escalation.*
+
 **Implementation Details**:
 - **3 instances deployed**: Crypto mining (t3.medium), Data exfiltration (t3.small), Privilege escalation (t3.small)
 - **AMI**: Amazon Linux 2023 (latest)
@@ -281,6 +284,9 @@ This platform integrates 12 AWS services to create a comprehensive security moni
 
 **Purpose**: Isolated network environment for security infrastructure.
 
+![VPC Architecture](docs/images/vpc-architecture.png)
+*Figure: VPC Resource Map showing the public and private subnet isolation, route tables, and internet gateway connectivity for the cloud security platform.*
+
 **Implementation Details**:
 - **CIDR Block**: 10.0.0.0/16
 - **Subnets**:
@@ -298,6 +304,9 @@ This platform integrates 12 AWS services to create a comprehensive security moni
 ### 8. AWS Lambda
 
 **Purpose**: Serverless compute for ML detection and incident response.
+
+![AWS Lambda Functions](docs/images/lambda-functions.png)
+*Figure: Deployed Lambda functions handling Machine Learning threat detection, automated incident response, and security event forwarding.*
 
 **Implementation Details**:
 
@@ -630,6 +639,9 @@ aws iam create-user --user-name backup-admin
 - Attempts to create a backdoor IAM user
 - Common persistence technique
 - CloudTrail logs the attempt
+
+![Privilege Escalation CloudWatch Logs](docs/images/cloudwatch-attack-logs.png)
+*Figure: Live CloudWatch log stream capturing the privilege escalation attack simulation, highlighting the unauthorized AccessDenied errors as the script attempts to attach policies and assume high-privilege roles.*
 
 **Expected Detections**:
 - GuardDuty: `Policy:IAMUser/RootCredentialUsage` (if root credentials used)
@@ -1351,6 +1363,9 @@ The platform provides comprehensive real-time visibility into security events th
 ```
 https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=Cloud-Security-Attack-Monitoring
 ```
+
+![CloudWatch Security Dashboard](docs/images/cloudwatch-dashboard.png)
+*Figure: The primary real-time CloudWatch dashboard aggregating attack simulations, ML detection results, GuardDuty expected findings, CPU utilization spikes, and event timelines.*
 
 **7 Widgets Providing Complete Visibility**:
 
