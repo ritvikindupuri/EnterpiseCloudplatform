@@ -81,11 +81,11 @@ graph TB
     EC2_CRYPTO -->|API calls| CLOUDTRAIL
     EC2_CRYPTO -->|Logs| CLOUDWATCH
     EC2_CRYPTO -->|Network| VPCFLOW
-    
+
     EC2_EXFIL -->|API calls| CLOUDTRAIL
     EC2_EXFIL -->|Logs| CLOUDWATCH
     EC2_EXFIL -->|Network| VPCFLOW
-    
+
     EC2_PRIV -->|API calls| CLOUDTRAIL
     EC2_PRIV -->|Logs| CLOUDWATCH
     EC2_PRIV -->|Network| VPCFLOW
@@ -94,17 +94,17 @@ graph TB
     CLOUDTRAIL --> SECURITYHUB
     VPCFLOW --> GUARDDUTY
     CONFIG --> SECURITYHUB
-    
+
     CLOUDWATCH --> ML_LAMBDA
-    
+
     GUARDDUTY --> EVENTBRIDGE
     SECURITYHUB --> EVENTBRIDGE
     ML_LAMBDA --> CLOUDWATCH
-    
+
     EVENTBRIDGE --> INCIDENT_LAMBDA
     INCIDENT_LAMBDA --> FORENSICS
     INCIDENT_LAMBDA --> SNS
-    
+
     CLOUDWATCH --> DASHBOARD
     CLOUDWATCH --> METRICS
     METRICS --> ALARMS
@@ -142,6 +142,9 @@ This platform integrates 12 AWS services to create a comprehensive security moni
 ### 1. Amazon EC2 (Elastic Compute Cloud)
 
 **Purpose**: Hosts the attack simulation instances that generate real security events.
+
+![EC2 Attack Instances](docs/images/ec2-attack-instance.png)
+*Figure: The three running EC2 instances actively generating real attack telemetry: data exfiltration, crypto mining, and privilege escalation.*
 
 **Implementation Details**:
 - **3 instances deployed**: Crypto mining (t3.medium), Data exfiltration (t3.small), Privilege escalation (t3.small)
@@ -281,6 +284,9 @@ This platform integrates 12 AWS services to create a comprehensive security moni
 
 **Purpose**: Isolated network environment for security infrastructure.
 
+![VPC Architecture](docs/images/vpc-architecture.png)
+*Figure: VPC Resource Map showing the public and private subnet isolation, route tables, and internet gateway connectivity for the cloud security platform.*
+
 **Implementation Details**:
 - **CIDR Block**: 10.0.0.0/16
 - **Subnets**:
@@ -299,24 +305,27 @@ This platform integrates 12 AWS services to create a comprehensive security moni
 
 **Purpose**: Serverless compute for ML detection and incident response.
 
+![AWS Lambda Functions](docs/images/lambda-functions.png)
+*Figure: Deployed Lambda functions handling Machine Learning threat detection, automated incident response, and security event forwarding.*
+
 **Implementation Details**:
 
-**ML Detection Lambda** (`cloud-security-ml-detector`):
+**ML Detection Lambda** (`cloud-security-ml-detector` / `ml_detector.py`):
 - **Runtime**: Python 3.11
 - **Memory**: 512 MB
 - **Timeout**: 300 seconds (5 minutes)
 - **Trigger**: EventBridge rule (rate: 5 minutes)
-- **Function**: Analyzes CloudWatch logs using ML patterns
+- **Function**: Analyzes CloudWatch logs using ML patterns via Python script.
 - **Output**: Writes detections to `/aws/ml-detection/results`
 
-**GuardDuty Forwarder Lambda** (`guardduty-to-cloudwatch`):
+**GuardDuty Forwarder Lambda** (`guardduty-to-cloudwatch` / `guardduty-forwarder.py`):
 - **Runtime**: Python 3.11
 - **Timeout**: 60 seconds
 - **Trigger**: EventBridge rule on GuardDuty findings
-- **Function**: Logs findings to CloudWatch, triggers incident response for critical findings
+- **Function**: Logs findings to CloudWatch, triggers incident response for critical findings via `boto3`.
 - **VPC**: Deployed in private subnet
 
-**Incident Response Lambda** (`cloud-security-incident-response`):
+**Incident Response Lambda** (`cloud-security-incident-response` / `automated-response.py`):
 - **Runtime**: Python 3.11
 - **Memory**: 512 MB
 - **Timeout**: 300 seconds
@@ -328,7 +337,7 @@ This platform integrates 12 AWS services to create a comprehensive security moni
   - Evidence collection to S3
   - SNS notifications
 
-**Security Hub Forwarder Lambda** (`security-hub-to-cloudwatch`):
+**Security Hub Forwarder Lambda** (`security-hub-to-cloudwatch` / `security-hub-forwarder.py`):
 - **Runtime**: Python 3.11
 - **Timeout**: 60 seconds
 - **Trigger**: EventBridge rule on Security Hub findings
@@ -631,6 +640,9 @@ aws iam create-user --user-name backup-admin
 - Common persistence technique
 - CloudTrail logs the attempt
 
+![Privilege Escalation CloudWatch Logs](docs/images/cloudwatch-attack-logs.png)
+*Figure: Live CloudWatch log stream capturing the privilege escalation attack simulation, highlighting the unauthorized AccessDenied errors as the script attempts to attach policies and assume high-privilege roles.*
+
 **Expected Detections**:
 - GuardDuty: `Policy:IAMUser/RootCredentialUsage` (if root credentials used)
 - GuardDuty: `Stealth:IAMUser/CloudTrailLoggingDisabled` (if attempted)
@@ -864,7 +876,7 @@ def generate_security_events(n_samples=10000):
             'network_bytes': np.random.randint(100, 10000),
             'label': 0  # Benign
         })
-    
+
     # Malicious events (30%)
     for i in range(int(n_samples * 0.3)):
         events.append({
@@ -931,10 +943,10 @@ THREAT_PATTERNS = {
 def analyze_log_entry(log_message):
     threats_detected = []
     log_lower = log_message.lower()
-    
+
     for threat_type, pattern in THREAT_PATTERNS.items():
         matches = sum(1 for keyword in pattern['keywords'] if keyword in log_lower)
-        
+
         if matches > 0:
             confidence = pattern['confidence'] * (matches / len(pattern['keywords']))
             threats_detected.append({
@@ -942,7 +954,7 @@ def analyze_log_entry(log_message):
                 'severity': pattern['severity'],
                 'confidence': round(confidence, 2)
             })
-    
+
     return threats_detected
 ```
 
@@ -1192,7 +1204,7 @@ if 'Exfiltration' in finding_type:
             'IpRanges': [{'CidrIp': '0.0.0.0/0'}]
         }]
     )
-    
+
     # Create EBS snapshot for forensics
     ec2_client.create_snapshot(
         VolumeId=volume_id,
@@ -1208,7 +1220,7 @@ if 'UnauthorizedAccess' in finding_type or 'Backdoor' in finding_type:
         UserName=username,
         AccessKeyId=access_key_id
     )
-    
+
     # Attach deny-all policy
     iam_client.attach_user_policy(
         UserName=username,
@@ -1347,21 +1359,24 @@ The platform provides comprehensive real-time visibility into security events th
 
 ### CloudWatch Dashboard: Cloud-Security-Attack-Monitoring
 
-**Dashboard URL**: 
+**Dashboard URL**:
 ```
 https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=Cloud-Security-Attack-Monitoring
 ```
+
+![CloudWatch Security Dashboard](docs/images/cloudwatch-dashboard.png)
+*Figure: The primary real-time CloudWatch dashboard aggregating attack simulations, ML detection results, GuardDuty expected findings, CPU utilization spikes, and event timelines.*
 
 **7 Widgets Providing Complete Visibility**:
 
 #### Widget 1: Real-Time Attack Simulations
 - **Type**: Log Insights query
-- **Query**: 
+- **Query**:
 ```
-SOURCE '/aws/ec2/attack-simulations' 
-| fields @timestamp, @message 
-| filter @message like /attack/ 
-| sort @timestamp desc 
+SOURCE '/aws/ec2/attack-simulations'
+| fields @timestamp, @message
+| filter @message like /attack/
+| sort @timestamp desc
 | limit 100
 ```
 - **Purpose**: Shows all attack activity as it happens
@@ -1377,10 +1392,10 @@ SOURCE '/aws/ec2/attack-simulations'
 - **Type**: Log Insights query
 - **Query**:
 ```
-SOURCE '/aws/ec2/attack-simulations' 
-| fields @timestamp, @message 
-| filter @message like /GuardDuty/ 
-| sort @timestamp desc 
+SOURCE '/aws/ec2/attack-simulations'
+| fields @timestamp, @message
+| filter @message like /GuardDuty/
+| sort @timestamp desc
 | limit 50
 ```
 - **Purpose**: Shows what GuardDuty findings should be generated
@@ -1394,9 +1409,9 @@ SOURCE '/aws/ec2/attack-simulations'
 - **Type**: Log Insights query
 - **Query**:
 ```
-SOURCE '/aws/ml-detection/results' 
-| fields @timestamp, threat_type, confidence, severity 
-| sort @timestamp desc 
+SOURCE '/aws/ml-detection/results'
+| fields @timestamp, threat_type, confidence, severity
+| sort @timestamp desc
 | limit 50
 ```
 - **Purpose**: Shows ML model detections with confidence scores
@@ -1422,9 +1437,9 @@ SOURCE '/aws/ml-detection/results'
 - **Type**: Log Insights query with stats
 - **Query**:
 ```
-SOURCE '/aws/ec2/attack-simulations' 
-| fields @timestamp, @message 
-| filter @message like /crypto/ or @message like /mining/ 
+SOURCE '/aws/ec2/attack-simulations'
+| fields @timestamp, @message
+| filter @message like /crypto/ or @message like /mining/
 | stats count() by bin(5m)
 ```
 - **Purpose**: Timeline of crypto mining events
@@ -1434,9 +1449,9 @@ SOURCE '/aws/ec2/attack-simulations'
 - **Type**: Log Insights query with stats
 - **Query**:
 ```
-SOURCE '/aws/ec2/attack-simulations' 
-| fields @timestamp, @message 
-| filter @message like /exfiltration/ or @message like /bucket/ 
+SOURCE '/aws/ec2/attack-simulations'
+| fields @timestamp, @message
+| filter @message like /exfiltration/ or @message like /bucket/
 | stats count() by bin(5m)
 ```
 - **Purpose**: Timeline of data exfiltration attempts
@@ -1446,9 +1461,9 @@ SOURCE '/aws/ec2/attack-simulations'
 - **Type**: Log Insights query with stats
 - **Query**:
 ```
-SOURCE '/aws/ec2/attack-simulations' 
-| fields @timestamp, @message 
-| filter @message like /privilege/ or @message like /escalation/ 
+SOURCE '/aws/ec2/attack-simulations'
+| fields @timestamp, @message
+| filter @message like /privilege/ or @message like /escalation/
 | stats count() by bin(5m)
 ```
 - **Purpose**: Timeline of privilege escalation attempts
@@ -1547,8 +1562,8 @@ resource "aws_cloudwatch_metric_alarm" "crypto_mining_alarm" {
 
 **Example Investigation Query**:
 ```
-SOURCE '/aws/ec2/attack-simulations' 
-| fields @timestamp, @message 
+SOURCE '/aws/ec2/attack-simulations'
+| fields @timestamp, @message
 | filter @message like /i-05a40c1492ae126ed/
 | sort @timestamp desc
 ```
@@ -1617,7 +1632,7 @@ The platform implements comprehensive compliance monitoring aligned with industr
 - 4.4: Ensure default security group restricts all traffic
 - 4.5: Ensure routing tables for VPC peering are least access
 
-**Our Compliance Status**: 
+**Our Compliance Status**:
 - **Passing**: 38/42 controls (90.5%)
 - **Failing**: 4 controls (intentionally for attack simulation)
   - 4.1: Attack instances allow SSH from 0.0.0.0/0 (required for demo)
@@ -1662,7 +1677,7 @@ The platform implements comprehensive compliance monitoring aligned with industr
 - Security Hub compliance checks
 - Automated vulnerability scanning (if enabled)
 
-**Our Compliance Status**: 
+**Our Compliance Status**:
 - **Passing**: 45/52 controls (86.5%)
 - **Failing**: 7 controls (not applicable for demo environment)
 
@@ -1698,7 +1713,7 @@ The platform implements comprehensive compliance monitoring aligned with industr
 - CloudTrail.2: CloudTrail should have encryption at rest enabled
 - CloudTrail.4: CloudTrail log file validation should be enabled
 
-**Our Compliance Status**: 
+**Our Compliance Status**:
 - **Passing**: 92/100 controls (92%)
 - **Failing**: 8 controls (intentional for attack simulation)
 
@@ -1763,6 +1778,14 @@ terraform/
 ├── terraform.tfvars             # Variable values (gitignored)
 └── terraform.tfvars.example     # Example configuration
 ```
+
+### Operational Scripts
+
+The project includes several key operational scripts located in the `scripts/` directory to manage the environment:
+
+- `package-lambda.ps1` / `package-lambda.sh`: Packages Lambda function dependencies and source code into `.zip` files for deployment.
+- `verify-cleanup.sh`: Checks your AWS account to verify that all deployed infrastructure has been deleted, avoiding unexpected charges.
+- `cleanup-everything.sh` / `cleanup-everything.ps1`: Comprehensive cleanup scripts that run a Terraform destroy operation and subsequently perform a manual deletion of resources (S3, Lambda, GuardDuty, VPC, EventBridge, CloudWatch logs, etc.) to ensure a clean slate.
 
 ### Key Terraform Resources
 
@@ -1888,7 +1911,7 @@ cd ../scripts
 # or
 ./package-lambda.sh   # Linux/Mac
 ```
-Creates: `lambda-packages/ml-detector.zip`
+Creates necessary `.zip` files for Lambda deployment, such as `lambda-packages/ml-detector.zip`.
 
 **Step 5: Initialize Terraform**
 ```bash
@@ -2008,11 +2031,8 @@ cd ../scripts
 ```
 
 **Manual Cleanup** (if needed):
-- Empty and delete S3 buckets
-- Delete CloudWatch log groups
-- Disable GuardDuty
-- Disable Security Hub
-- Delete Lambda functions
+- You can run the comprehensive cleanup script: `./scripts/cleanup-everything.sh` or `./scripts/cleanup-everything.ps1`
+- Or manually empty and delete S3 buckets, CloudWatch log groups, disable GuardDuty and Security Hub, and delete Lambda functions.
 
 ### Cost Optimization
 
@@ -2202,14 +2222,13 @@ This project demonstrates enterprise-grade cloud security engineering capabiliti
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: March 19, 2026  
-**Author**: Ritvik Indupuri  
-**Contact**: ritvik.indupuri@gmail.com  
-**AWS Account**: 195275680107  
+**Document Version**: 1.0
+**Last Updated**: March 19, 2026
+**Author**: Ritvik Indupuri
+**Contact**: ritvik.indupuri@gmail.com
+**AWS Account**: 195275680107
 **Region**: us-east-1
 
 ---
 
 *This documentation provides complete technical details of the Enterprise Cloud Security Platform. For deployment instructions, see the README.md file. For questions or clarifications, contact the author.*
-
