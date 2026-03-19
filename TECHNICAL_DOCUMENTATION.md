@@ -1732,7 +1732,12 @@ Infrastructure as Code with Terraform ensures the entire platform is reproducibl
 
 ## Conclusion
 
-This Enterprise Cloud Security Platform represents a production-ready, comprehensive security solution that demonstrates advanced cloud security engineering capabilities. Unlike typical portfolio projects that use simulated data or mock services, this platform runs real attacks on actual AWS infrastructure and detects them using enterprise-grade security services.
+This Enterprise Cloud Security Platform represents a production-ready, comprehensive security solution that demonstrates advanced cloud security engineering capabilities. By seamlessly integrating 12 AWS services (such as GuardDuty, Security Hub, CloudTrail, CloudWatch, Config, and EventBridge), this platform creates a robust defense-in-depth architecture.
+
+Unlike typical portfolio projects that rely on simulated data or mock services, this platform runs real, active attacks—crypto mining, data exfiltration, and privilege escalation—on actual AWS infrastructure. This telemetry is then detected and mitigated using enterprise-grade native security services alongside a highly accurate custom Machine Learning pipeline. The ensemble ML models (Random Forest, Gradient Boosting, Neural Networks) successfully analyze live CloudWatch logs, dynamically calculate threat confidence and severity scores, and trigger automated Lambda incident responses within 20 seconds of an attack sequence.
+
+Every component of this infrastructure is defined as code using Terraform, ensuring reproducible deployments, version control, and stringent adherence to compliance standards (CIS Benchmark, PCI-DSS, AWS Foundational Security). The real-time CloudWatch dashboards provide immediate operational visibility, bridging the gap between raw data collection and actionable security insights. Ultimately, this platform validates deep, practical knowledge of cloud security best practices, automated DevSecOps workflows, and applied data science in a modern threat landscape.
+
 
 ### Future Enhancements
 
@@ -1755,13 +1760,6 @@ This Enterprise Cloud Security Platform represents a production-ready, comprehen
 - Automated scaling based on threat volume
 - Integration with existing SOC tools
 
-### Final Conclusion
-
-This Enterprise Cloud Security Platform represents a production-ready, comprehensive security solution that demonstrates advanced cloud security engineering capabilities. By seamlessly integrating 12 AWS services (such as GuardDuty, Security Hub, CloudTrail, CloudWatch, Config, and EventBridge), this platform creates a robust defense-in-depth architecture.
-
-Unlike typical portfolio projects that rely on simulated data or mock services, this platform runs real, active attacks—crypto mining, data exfiltration, and privilege escalation—on actual AWS infrastructure. This telemetry is then detected and mitigated using enterprise-grade native security services alongside a highly accurate custom Machine Learning pipeline. The ensemble ML models (Random Forest, Gradient Boosting, Neural Networks) successfully analyze live CloudWatch logs, dynamically calculate threat confidence and severity scores, and trigger automated Lambda incident responses within 20 seconds of an attack sequence.
-
-Every component of this infrastructure is defined as code using Terraform, ensuring reproducible deployments, version control, and stringent adherence to compliance standards (CIS Benchmark, PCI-DSS, AWS Foundational Security). The real-time CloudWatch dashboards provide immediate operational visibility, bridging the gap between raw data collection and actionable security insights. Ultimately, this platform validates deep, practical knowledge of cloud security best practices, automated DevSecOps workflows, and applied data science in a modern threat landscape.
 
 ---
 
