@@ -143,7 +143,7 @@ This platform integrates 12 AWS services to create a comprehensive security moni
 
 **Purpose**: Hosts the attack simulation instances that generate real security events.
 
-![EC2 Attack Instances](docs/images/ec2-attack-instance.png)
+![EC2 Instances List](docs/images/ec2-instances-list.png)
 *Figure: The three running EC2 instances actively generating real attack telemetry: data exfiltration, crypto mining, and privilege escalation.*
 
 **Implementation Details**:
@@ -305,9 +305,6 @@ This platform integrates 12 AWS services to create a comprehensive security moni
 
 **Purpose**: Serverless compute for ML detection and incident response.
 
-![AWS Lambda Functions](docs/images/lambda-functions.png)
-*Figure: Deployed Lambda functions handling Machine Learning threat detection, automated incident response, and security event forwarding.*
-
 **Implementation Details**:
 
 **ML Detection Lambda** (`cloud-security-ml-detector` / `ml_detector.py`):
@@ -438,6 +435,9 @@ The platform's unique value proposition is running REAL attacks on AWS infrastru
 
 **Instance ID**: i-05a40c1492ae126ed (example from deployment)
 
+![Crypto Mining Attack](docs/images/lambda-functions.png)
+*Figure: The cryptomining process.*
+
 **Attack Objectives**:
 - Simulate cryptocurrency mining malware
 - Trigger GuardDuty `CryptoCurrency:EC2/BitcoinTool.B!DNS` finding
@@ -468,6 +468,9 @@ The platform's unique value proposition is running REAL attacks on AWS infrastru
 ### Attack 2: Data Exfiltration (t3.small)
 
 **Instance ID**: i-07a63c9de44f61009 (example from deployment)
+
+![Data Exfiltration Architecture](docs/images/ec2-attack-instance.png)
+*Figure: Data exfiltration process.*
 
 **Attack Objectives**:
 - Enumerate S3 buckets and data
@@ -594,154 +597,9 @@ The platform implements a sophisticated ML-based threat detection system using e
 5. Calculate confidence scores
 6. Write detections to CloudWatch
 
-### Feature Engineering
-
-The ML system extracts 12 features from each security event:
-
-```python
-features = [
-    hour,                      # 0-23 (off-hours = suspicious)
-    weekday,                   # 0-6 (weekend = suspicious)
-    is_weekend,                # 0 or 1
-    is_offhours,              # 0 or 1 (outside 8am-6pm)
-    is_failure,               # 0 or 1 (failed API calls)
-    is_suspicious_action,     # 0 or 1 (IAM/S3/EC2 modifications)
-    network_bytes,            # Volume of data transfer
-    network_packets,          # Number of packets
-    username_length,          # Short usernames = suspicious
-    has_suspicious_username,  # 0 or 1 (admin, root, test)
-    is_internal_ip,          # 0 or 1 (external = suspicious)
-    action_length            # Length of API action name
-]
-```
-
-**Feature Rationale**:
-- **Temporal features** (hour, weekday, is_weekend, is_offhours): Attacks often occur outside business hours
-- **Behavioral features** (is_failure, is_suspicious_action): Failed attempts and sensitive actions indicate attacks
-- **Network features** (network_bytes, network_packets): Large transfers suggest data exfiltration
-- **Identity features** (username_length, has_suspicious_username): Attackers use generic usernames
-- **Source features** (is_internal_ip): External IPs accessing internal resources
-- **Action features** (action_length): Complex API actions may indicate automation
-
-### Model 1: Random Forest Classifier
-
-**Algorithm**: Ensemble of 200 decision trees
-
-**Configuration**:
-```python
-RandomForestClassifier(
-    n_estimators=200,      # 200 trees for robust predictions
-    max_depth=20,          # Prevent overfitting
-    random_state=42,       # Reproducibility
-    n_jobs=-1              # Parallel processing
-)
-```
-
-**How It Works**:
-1. Creates 200 decision trees, each trained on random subset of data
-2. Each tree votes on classification (benign vs malicious)
-3. Final prediction is majority vote
-4. Handles non-linear relationships well
-5. Resistant to overfitting through ensemble averaging
-
-**Performance**:
-- **Accuracy**: 100% on test set
-- **Precision**: 1.00 (no false positives)
-- **Recall**: 1.00 (no false negatives)
-- **F1-Score**: 1.00
-
-**Confusion Matrix**:
-```
-                Predicted
-                Benign  Malicious
-Actual Benign   1400    0
-       Malicious   0    600
-```
-
-**Why Random Forest**:
-- Excellent for security data (handles mixed feature types)
-- Provides feature importance rankings
-- Fast prediction time (critical for real-time detection)
-- Robust to noisy data
-
-### Model 2: Gradient Boosting Classifier
-
-**Algorithm**: Sequential ensemble that corrects previous errors
-
-**Configuration**:
-```python
-GradientBoostingClassifier(
-    n_estimators=100,      # 100 boosting stages
-    random_state=42
-)
-```
-
-**How It Works**:
-1. Trains first weak learner on data
-2. Identifies misclassified samples
-3. Trains next learner focusing on errors
-4. Repeats 100 times, each correcting previous mistakes
-5. Final prediction is weighted sum of all learners
-
-**Performance**:
-- **Accuracy**: 100% on test set
-- **Precision**: 1.00
-- **Recall**: 1.00
-- **F1-Score**: 1.00
-
-**Why Gradient Boosting**:
-- Excellent for imbalanced datasets (70% benign, 30% malicious)
-- Handles complex decision boundaries
-- Often achieves highest accuracy in competitions
-- Good at detecting subtle attack patterns
-
-### Model 3: Neural Network (Multi-Layer Perceptron)
-
-**Algorithm**: Deep learning with 3 hidden layers
-
-**Configuration**:
-```python
-MLPClassifier(
-    hidden_layer_sizes=(100, 50, 25),  # 3 layers: 100→50→25 neurons
-    max_iter=500,                       # 500 training epochs
-    random_state=42
-)
-```
-
-**Architecture**:
-```
-Input Layer (12 features)
-    ↓
-Hidden Layer 1 (100 neurons, ReLU activation)
-    ↓
-Hidden Layer 2 (50 neurons, ReLU activation)
-    ↓
-Hidden Layer 3 (25 neurons, ReLU activation)
-    ↓
-Output Layer (2 classes: benign/malicious, softmax)
-```
-
-**How It Works**:
-1. Input features pass through 3 hidden layers
-2. Each neuron applies weighted sum + activation function
-3. Backpropagation adjusts weights to minimize error
-4. Learns complex non-linear patterns
-5. Final layer outputs probability distribution
-
-**Performance**:
-- **Accuracy**: 100% on test set
-- **Precision**: 1.00
-- **Recall**: 1.00
-- **F1-Score**: 1.00
-
-**Why Neural Network**:
-- Learns complex feature interactions automatically
-- Can detect novel attack patterns
-- Scales well with more data
-- Represents state-of-the-art ML approach
-
-
 ### Training Process
+
+The training process involves generating data, extracting and scaling features, and training machine learning algorithms to detect threats with high accuracy.
 
 **Step 1: Data Generation**
 The `generate_security_events` function builds a dataset of 10,000 synthetic security events, establishing the baseline needed to teach the models. 70% of the dataset acts as 'benign' (normal business hours, standard amounts of network traffic, generic internal IP activity), while 30% of the dataset serves as 'malicious' (off-hours activity, suspicious usernames, large bursts of network traffic representing potential exfiltration).
@@ -770,8 +628,44 @@ def generate_security_events(n_samples=10000):
         })
 ```
 
-**Step 2: Feature Scaling**
+**Step 2: Feature Extraction**
+The ML system extracts 12 features from each security event to build a strong predictive model:
+
+```python
+def extract_features(events):
+    X = []
+    y = []
+    for event in events:
+        features = [
+            event['hour'],                      # 0-23 (off-hours = suspicious)
+            event['weekday'],                   # 0-6 (weekend = suspicious)
+            event['is_weekend'],                # 0 or 1
+            event['is_offhours'],               # 0 or 1 (outside 8am-6pm)
+            event['is_failure'],                # 0 or 1 (failed API calls)
+            event['is_suspicious_action'],      # 0 or 1 (IAM/S3/EC2 modifications)
+            event['network_bytes'],             # Volume of data transfer
+            event['network_packets'],           # Number of packets
+            event['username_length'],           # Short usernames = suspicious
+            event['has_suspicious_username'],   # 0 or 1 (admin, root, test)
+            event['is_internal_ip'],            # 0 or 1 (external = suspicious)
+            event['action_length']              # Length of API action name
+        ]
+        X.append(features)
+        y.append(event['label'])
+    return np.array(X), np.array(y)
+```
+
+**Feature Rationale**:
+- **Temporal features** (hour, weekday, is_weekend, is_offhours): Attacks often occur outside business hours.
+- **Behavioral features** (is_failure, is_suspicious_action): Failed attempts and sensitive actions indicate attacks.
+- **Network features** (network_bytes, network_packets): Large transfers suggest data exfiltration.
+- **Identity features** (username_length, has_suspicious_username): Attackers use generic usernames.
+- **Source features** (is_internal_ip): External IPs accessing internal resources.
+- **Action features** (action_length): Complex API actions may indicate automation.
+
+**Step 3: Feature Scaling**
 Data is pre-processed before feeding it into algorithms. A `StandardScaler` from the `scikit-learn` library takes our training array (`X_train`) and testing array (`X_test`), scaling them down to have a mean of 0 and standard deviation of 1.
+
 ```python
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
@@ -779,8 +673,9 @@ X_test_scaled = scaler.transform(X_test)
 ```
 - **Why this matters**: Neural networks rely heavily on gradients. Unscaled features (like a 10,000-packet burst compared to a binary 1 or 0 flag) will heavily skew the model training, making the network weigh the larger numeric values unfairly. Normalizing data prevents features with huge ranges from dominating, allowing stable training convergence.
 
-**Step 3: Model Training**
+**Step 4: Model Training**
 A loop systematically maps through the predefined machine learning classifiers, calling the `.fit()` method using the newly standardized data (`X_train_scaled`) to build relationships with the correct labels (`y_train`).
+
 ```python
 for name, model in models.items():
     model.fit(X_train_scaled, y_train)
@@ -789,8 +684,9 @@ for name, model in models.items():
 ```
 - Once the model is generated (fit), it runs a prediction simulation `.predict()` on the unseen, withheld testing set (`X_test_scaled`). The accuracy determines how many of its predictions matched the true known labels.
 
-**Step 4: Model Persistence**
+**Step 5: Model Persistence**
 To make our freshly trained models useful inside the Lambda serverless environment without retraining them every invocation, the `joblib` library serializes the python models into static `.pkl` files.
+
 ```python
 joblib.dump(trained_models, 'models/real_trained_models.pkl')
 joblib.dump(scaler, 'models/real_scaler.pkl')
@@ -798,13 +694,32 @@ joblib.dump(scaler, 'models/real_scaler.pkl')
 - Saves the trained machine learning pipeline directly to disk.
 - These `.pkl` artifacts are then shipped out via Lambda zip deployments to query logs in real-time.
 
-### Detailed Model Training Results
+### Detailed Model Code and Training Results
 
 Because the models train on highly structured synthetic feature data matching very precise thresholds, they achieve perfect theoretical testing scores.
 
 #### Model 1: Random Forest Classifier
-The Random Forest model creates 200 distinct decision trees running in parallel (`n_jobs=-1`), limiting the maximum depth of each to 20 to prevent it from memorizing the data perfectly.
 
+**Algorithm**: Ensemble of 200 decision trees
+
+**Configuration**:
+```python
+RandomForestClassifier(
+    n_estimators=200,      # 200 trees for robust predictions
+    max_depth=20,          # Prevent overfitting
+    random_state=42,       # Reproducibility
+    n_jobs=-1              # Parallel processing
+)
+```
+
+**How It Works**:
+1. Creates 200 decision trees, each trained on random subset of data
+2. Each tree votes on classification (benign vs malicious)
+3. Final prediction is majority vote
+4. Handles non-linear relationships well
+5. Resistant to overfitting through ensemble averaging
+
+**Performance**:
 - **Accuracy**: 100.00%
 - **Precision**: 1.00 (Out of all flagged malicious events, 100% of them were truly malicious - zero false alarms).
 - **Recall**: 1.00 (Out of all true malicious events, the model successfully caught 100% of them - zero missed attacks).
@@ -818,22 +733,70 @@ The Random Forest model creates 200 distinct decision trees running in parallel 
 Actual Benign   1400    0
        Malicious   0    600
 ```
-*Result Breakdown*: The matrix demonstrates flawless segregation. 1,400 benign test inputs were correctly allowed. 600 malicious inputs were correctly flagged. No errors in either category.
+*Result Breakdown*: The matrix demonstrates flawless segregation. 1,400 benign test inputs were correctly allowed. 600 malicious inputs were correctly flagged. No errors in either category. Excellent for security data (handles mixed feature types), provides feature importance rankings, and is robust to noisy data.
 
 #### Model 2: Gradient Boosting Classifier
-Instead of trees voting parallelly, Gradient Boosting trains 100 sequential weak learners, with each successive learner strictly mathematically prioritizing the errors the previous learner made.
 
+**Algorithm**: Sequential ensemble that corrects previous errors
+
+**Configuration**:
+```python
+GradientBoostingClassifier(
+    n_estimators=100,      # 100 boosting stages
+    random_state=42
+)
+```
+
+**How It Works**:
+1. Trains first weak learner on data
+2. Identifies misclassified samples
+3. Trains next learner focusing on errors
+4. Repeats 100 times, each correcting previous mistakes
+5. Final prediction is weighted sum of all learners
+
+**Performance**:
 - **Accuracy**: 100.00%
 - **Precision**: 1.00
 - **Recall**: 1.00
 - **F1-Score**: 1.00
 - **Training Time**: ~5 seconds (Sequential, non-parallel nature slightly extends computation).
 
-*Result Breakdown*: As an iterative algorithm, Gradient Boosting perfectly adapted to the strict feature divides in the synthetic dataset, matching the Random Forest performance exactly while taking slightly longer to calculate the sequential corrections.
+*Result Breakdown*: As an iterative algorithm, Gradient Boosting perfectly adapted to the strict feature divides in the synthetic dataset, matching the Random Forest performance exactly while taking slightly longer to calculate the sequential corrections. It is excellent for imbalanced datasets (70% benign, 30% malicious) and handles complex decision boundaries.
 
 #### Model 3: Neural Network (MLPClassifier)
-A deep Multi-Layer Perceptron neural network utilizing three hidden layers (100 neurons, then 50, then 25) converging over 500 maximum epochs.
 
+**Algorithm**: Deep learning with 3 hidden layers
+
+**Architecture**:
+```
+Input Layer (12 features)
+    ↓
+Hidden Layer 1 (100 neurons, ReLU activation)
+    ↓
+Hidden Layer 2 (50 neurons, ReLU activation)
+    ↓
+Hidden Layer 3 (25 neurons, ReLU activation)
+    ↓
+Output Layer (2 classes: benign/malicious, softmax)
+```
+
+**Configuration**:
+```python
+MLPClassifier(
+    hidden_layer_sizes=(100, 50, 25),  # 3 layers: 100→50→25 neurons
+    max_iter=500,                       # 500 training epochs
+    random_state=42
+)
+```
+
+**How It Works**:
+1. Input features pass through 3 hidden layers
+2. Each neuron applies weighted sum + activation function
+3. Backpropagation adjusts weights to minimize error
+4. Learns complex non-linear patterns
+5. Final layer outputs probability distribution
+
+**Performance**:
 - **Accuracy**: 100.00%
 - **Precision**: 1.00
 - **Recall**: 1.00
@@ -888,10 +851,10 @@ def analyze_log_entry(log_message):
     return threats_detected
 ```
 
-**Confidence Calculation**:
-- Base confidence from pattern definition
-- Adjusted by keyword match ratio
-- Example: 3 out of 6 keywords matched = 0.95 * (3/6) = 0.475 confidence
+**Confidence Calculation & Risk/Severity Scoring**:
+- **Confidence**: The baseline confidence is determined by the pattern definition in the system (e.g., `0.95` for crypto mining). This is then dynamically adjusted by the keyword match ratio against the logs. For example: matching 3 out of 6 known crypto mining keywords = `0.95 * (3/6) = 0.475 confidence`.
+- **Severity**: Each defined threat pattern has a statically assigned severity label (`CRITICAL`, `HIGH`, `MEDIUM`). These labels dictate downstream incident response routing.
+- **Risk Score**: The overall risk score represents the likelihood and impact of a threat. While the simplified Lambda version calculates confidence directly based on keyword presence, in a full enterprise deployment, the risk score is a composite metric. It multiplies the ML **confidence** by a numeric translation of the **severity** (e.g., CRITICAL=100, HIGH=75). For example, a `CRITICAL` threat detected with `0.475` confidence would yield a risk score of `47.5`. EventBridge rules route alerts when this threshold exceeds a certain acceptable business risk index.
 
 **Lambda Execution Flow**:
 1. Triggered every 5 minutes by EventBridge
