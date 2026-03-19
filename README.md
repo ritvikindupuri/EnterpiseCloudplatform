@@ -805,8 +805,6 @@ aws ec2 stop-instances --instance-ids <instance-id-1> <instance-id-2> <instance-
 
 **Ritvik Indupuri**  
 Email: ritvik.indupuri@gmail.com  
-AWS Account: 195275680107  
-Region: us-east-1
 
 ## License
 
