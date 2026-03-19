@@ -1,0 +1,18 @@
+# AWS Configuration
+aws_region = "us-east-1"
+environment = "production"
+
+# Network Configuration
+allowed_cidr_blocks = ["10.0.0.0/8"]  # Restrict to your corporate network
+
+# Security Team Configuration
+security_team_email = "security-team@example.com"
+
+# Feature Flags
+enable_guardduty = true
+enable_security_hub = true
+enable_config = true
+
+# Retention Policies
+log_retention_days = 90
+forensics_retention_days = 2555
