@@ -35,8 +35,7 @@ The platform successfully integrates 12 AWS services with custom machine learnin
 6. [Monitoring and Dashboards](#monitoring-and-dashboards)
 7. [Compliance and Governance](#compliance-and-governance)
 8. [Infrastructure as Code](#infrastructure-as-code)
-9. [Deployment and Operations](#deployment-and-operations)
-10. [Conclusion](#conclusion)
+9. [Conclusion](#conclusion)
 
 ---
 
@@ -1763,15 +1762,6 @@ This Enterprise Cloud Security Platform represents a production-ready, comprehen
 Unlike typical portfolio projects that rely on simulated data or mock services, this platform runs real, active attacks—crypto mining, data exfiltration, and privilege escalation—on actual AWS infrastructure. This telemetry is then detected and mitigated using enterprise-grade native security services alongside a highly accurate custom Machine Learning pipeline. The ensemble ML models (Random Forest, Gradient Boosting, Neural Networks) successfully analyze live CloudWatch logs, dynamically calculate threat confidence and severity scores, and trigger automated Lambda incident responses within 20 seconds of an attack sequence.
 
 Every component of this infrastructure is defined as code using Terraform, ensuring reproducible deployments, version control, and stringent adherence to compliance standards (CIS Benchmark, PCI-DSS, AWS Foundational Security). The real-time CloudWatch dashboards provide immediate operational visibility, bridging the gap between raw data collection and actionable security insights. Ultimately, this platform validates deep, practical knowledge of cloud security best practices, automated DevSecOps workflows, and applied data science in a modern threat landscape.
-
----
-
-**Document Version**: 1.0
-**Last Updated**: March 19, 2026
-**Author**: Ritvik Indupuri
-**Contact**: ritvik.indupuri@gmail.com
-**AWS Account**: 195275680107
-**Region**: us-east-1
 
 ---
 
