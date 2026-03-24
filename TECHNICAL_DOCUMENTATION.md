@@ -1144,6 +1144,32 @@ def analyze_log_entry(log_message):
 }
 ```
 
+### Static Rule vs. Weighted Feature Model Comparison
+
+To illustrate the value of the ML approach over traditional security alerting, consider the difference between a **Static Rule** and the **Weighted Feature Model (ML)** when analyzing an anomalous sequence of API calls.
+
+**Scenario**: An EC2 instance, typically used for application hosting, suddenly runs `aws iam list-users` and `aws s3 ls`.
+
+**Static Rule Approach (Traditional SIEM/Alerting)**:
+*   **Condition**: `IF (Source = EC2_Role) AND (Action = "iam:ListUsers" OR "s3:ListBuckets") THEN Alert`
+*   **Result**: The static rule triggers an alert immediately upon seeing these actions.
+*   **Score/Severity**: Typically fixed (e.g., "Medium" severity or a binary 1/0 alert).
+*   **Drawbacks**:
+    *   **High False Positives**: If an administrator briefly logs into the instance to debug a permissions issue and runs those commands, the rule fires, causing alert fatigue.
+    *   **Context Blind**: It does not care about the time of day, the frequency of the calls, the CPU utilization leading up to the event, or the historical baseline of the instance.
+
+**Weighted Feature Model Approach (Our ML Implementation)**:
+*   **Features Evaluated**:
+    *   `iam_calls_per_minute` (weight: 0.35)
+    *   `s3_reads_per_minute` (weight: 0.25)
+    *   `cpu_utilization_baseline_deviation` (weight: 0.20)
+    *   `is_outside_business_hours` (weight: 0.15)
+    *   `historical_action_frequency` (weight: 0.05)
+*   **Result**: The model ingests all these features concurrently. If the admin ran the commands during the day with normal CPU usage, the `iam_calls` feature spikes, but the other features remain normal. The ensemble model outputs a low probability score (e.g., `Confidence: 0.15`) and categorizes it as benign anomalous behavior, avoiding an alert.
+*   **Result (True Attack)**: If an attacker script runs these commands at 3:00 AM while the CPU is spiking from a concurrent cryptominer, *multiple* weighted features activate. The Random Forest and Gradient Boosting models recognize this multivariate correlation.
+*   **Score/Severity**: Dynamic probability score (e.g., `Confidence: 0.92`).
+*   **Advantage**: By evaluating the *weighted relationship* between multiple features simultaneously, the ML model dramatically reduces false positives while accurately calculating the true severity of a multi-stage attack.
+
 ### Why Ensemble Approach
 
 **Diversity**: Three different algorithms catch different attack patterns
